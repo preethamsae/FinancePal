@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 from datetime import datetime
-import plotly.express as px
 
 # --- App Configuration ---
 st.set_page_config(
@@ -15,9 +15,9 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .reportview-container .main .block-container{padding:1rem 2rem;}
-    .sidebar .sidebar-content {background-color: #f0f2f6;}
-    .stButton>button {background-color: #4CAF50; color: white; border-radius: 8px; padding: 10px;}
+    .reportview-container .main .block-container { padding:1rem 2rem; }
+    .sidebar .sidebar-content { background-color: #f0f2f6; }
+    .stButton>button { background-color: #4CAF50; color: white; border-radius: 8px; padding:10px; }
     </style>
     """, 
     unsafe_allow_html=True
@@ -40,14 +40,18 @@ if 'data' not in st.session_state:
     }
 
 # --- Sidebar Navigation ---
-st.sidebar.image("https://streamlit.io/images/brand/streamlit-logo-secondary-colormark-darktext.png", width=120)
+st.sidebar.image(
+    "https://streamlit.io/images/brand/streamlit-logo-secondary-colormark-darktext.png", width=120
+)
 st.sidebar.title("Financial Tracker")
-st.sidebar.markdown("""
-**Monitor. Analyze. Achieve.**
+st.sidebar.markdown(
+    """
+    **Monitor. Analyze. Achieve.**
 
-Use this sidebar to navigate across modules and track your money in one place.
-""")
-menu = [ '🏠 Home', '💼 Data Entry', '📊 Dashboards', '🔮 Projections' ]
+    Navigate modules to track and optimize your finances.
+    """
+)
+menu = ['🏠 Home', '💼 Data Entry', '📊 Dashboards', '🔮 Projections']
 choice = st.sidebar.radio("Go to", menu)
 
 data_pages = ['Income', 'Fixed Expense', 'Credit Cards', 'Credit Card EMI', 'Monthly Expenses', 'Loans', 'Savings']
@@ -61,8 +65,10 @@ def edit_table(sheet_name):
 # --- Home Page ---
 if choice == '🏠 Home':
     st.title("💰 Overview")
-    inc = st.session_state.data['Income'][st.session_state.data['Income']['Recurring']=='Yes']['Amount'].sum()
-    emi = st.session_state.data['Credit Card EMI'][st.session_state.data['Credit Card EMI']['Active']=='Yes']['EMI Amount'].sum()
+    inc = st.session_state.data['Income'][
+        st.session_state.data['Income']['Recurring']=='Yes']['Amount'].sum()
+    emi = st.session_state.data['Credit Card EMI'][
+        st.session_state.data['Credit Card EMI']['Active']=='Yes']['EMI Amount'].sum()
     fix = st.session_state.data['Fixed Expense']['Monthly Amount'].sum()
     leftover = inc - emi - fix
 
@@ -78,8 +84,12 @@ if choice == '🏠 Home':
         'Category': ['EMI', 'Fixed', 'Leftover'],
         'Amount': [emi, fix, max(leftover, 0)]
     })
-    fig = px.pie(breakdown, names='Category', values='Amount', hole=0.4)
-    st.plotly_chart(fig, use_container_width=True)
+    pie = alt.Chart(breakdown).mark_arc(innerRadius=50).encode(
+        theta=alt.Theta(field='Amount', type='quantitative'),
+        color=alt.Color(field='Category', type='nominal'),
+        tooltip=[alt.Tooltip('Category'), alt.Tooltip('Amount', format='₹,.0f')]
+    )
+    st.altair_chart(pie, use_container_width=True)
 
 # --- Data Entry Pages ---
 elif choice == '💼 Data Entry':
@@ -87,21 +97,21 @@ elif choice == '💼 Data Entry':
     selected = st.selectbox("Select Module", data_pages)
     edit_table(selected)
     if st.button("Save Data"):
-        st.success(f"{selected} data updated.")
+        st.success(f"{selected} data saved.")
 
 # --- Dashboards ---
 elif choice == '📊 Dashboards':
     st.title("📈 Dashboards")
-    tabs = st.tabs(["Annual Overview", "Monthly Trends"])
+    tab1, tab2 = st.tabs(["Annual Overview", "Trends"])
 
-    with tabs[0]:
+    with tab1:
         st.subheader("Annual Overview")
         inc_df = st.session_state.data['Income']
         fix_df = st.session_state.data['Fixed Expense']
         emi_df = st.session_state.data['Credit Card EMI']
         exp_df = st.session_state.data['Monthly Expenses']
         loan_df = st.session_state.data['Loans']
-        months = pd.date_range(start='2025-01-01', periods=12, freq='MS').strftime('%b')
+        months = pd.date_range('2025-01-01', periods=12, freq='MS').strftime('%b')
         rows = []
         for m in months:
             mn = datetime.strptime(m, '%b').month
@@ -111,7 +121,7 @@ elif choice == '📊 Dashboards':
                 'EMI': emi_df[emi_df['Active']=='Yes']['EMI Amount'].sum(),
                 'Expenses': exp_df[exp_df['Date'].dt.month==mn]['Amount'].sum(),
                 'Loan EMI': loan_df['EMI'].sum(),
-                'Fixed': fix_df['Monthly Amount'].sum(),
+                'Fixed': fix_df['Monthly Amount'].sum()
             })
         ann = pd.DataFrame(rows)
         ann['Leftover'] = ann['Income'] - ann['EMI'] - ann['Expenses'] - ann['Loan EMI'] - ann['Fixed']
@@ -119,19 +129,22 @@ elif choice == '📊 Dashboards':
             'Income':'₹{:,.0f}','EMI':'₹{:,.0f}','Expenses':'₹{:,.0f}',
             'Loan EMI':'₹{:,.0f}','Fixed':'₹{:,.0f}','Leftover':'₹{:,.0f}'
         }), use_container_width=True)
-    
-    with tabs[1]:
+
+    with tab2:
         st.subheader("Last 6 Months Leftover Trend")
         last6 = ann.tail(6)
-        fig2 = px.line(last6, x='Month', y='Leftover', markers=True)
-        fig2.update_layout(yaxis_title='Leftover (₹)', xaxis_title='Month')
-        st.plotly_chart(fig2, use_container_width=True)
+        line = alt.Chart(last6).mark_line(point=True).encode(
+            x='Month:N',
+            y=alt.Y('Leftover', title='Leftover (₹)'),
+            tooltip=[alt.Tooltip('Month'), alt.Tooltip('Leftover', format='₹,.0f')]
+        ).properties(width=600)
+        st.altair_chart(line, use_container_width=True)
 
 # --- Future Projections ---
 elif choice == '🔮 Projections':
     st.title("🔮 Future Projections")
-    st.write("Predictive analytics via ML coming soon! In the meantime, review your 3-year forecasts in the Savings module.")
+    st.info("Machine learning integration coming soon to forecast your net worth trajectory.")
 
+# --- Footer ---
 st.markdown("---")
 st.caption("Built with ❤️ using Streamlit | © 2025 Financial Tracker")
-# --- Footer ---
