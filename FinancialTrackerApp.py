@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import matplotlib.pyplot as plt
+import plotly.express as px
 
 # --- App Configuration ---
 st.set_page_config(
@@ -47,15 +47,11 @@ st.sidebar.markdown("""
 
 Use this sidebar to navigate across modules and track your money in one place.
 """)
-menu = [
-    '🏠 Home', '💼 Data Entry', '📊 Dashboards', '🔮 Projections'
-]
+menu = [ '🏠 Home', '💼 Data Entry', '📊 Dashboards', '🔮 Projections' ]
 choice = st.sidebar.radio("Go to", menu)
 
-# --- Data Entry Submenu ---
 data_pages = ['Income', 'Fixed Expense', 'Credit Cards', 'Credit Card EMI', 'Monthly Expenses', 'Loans', 'Savings']
 
-# --- Utility: Data Editor ---
 def edit_table(sheet_name):
     st.subheader(f"{sheet_name} Entry")
     df = st.session_state.data[sheet_name]
@@ -68,24 +64,22 @@ if choice == '🏠 Home':
     inc = st.session_state.data['Income'][st.session_state.data['Income']['Recurring']=='Yes']['Amount'].sum()
     emi = st.session_state.data['Credit Card EMI'][st.session_state.data['Credit Card EMI']['Active']=='Yes']['EMI Amount'].sum()
     fix = st.session_state.data['Fixed Expense']['Monthly Amount'].sum()
-    savings_goal = st.session_state.data['Savings']['Target Savings'].sum() or 0
     leftover = inc - emi - fix
-    
-    # Top Metrics
+
     cols = st.columns(4)
     cols[0].metric("Monthly Income", f"₹{inc:,.0f}")
     cols[1].metric("Active EMI", f"₹{emi:,.0f}")
     cols[2].metric("Fixed Expenses", f"₹{fix:,.0f}")
     cols[3].metric("Leftover", f"₹{leftover:,.0f}")
-    
+
     st.markdown("---")
     st.subheader("Expense Breakdown")
-    labels = ['EMI', 'Fixed', 'Leftover']
-    values = [emi, fix, max(leftover, 0)]
-    fig1, ax1 = plt.subplots()
-    ax1.pie(values, labels=labels, autopct='%1.1f%%', startangle=140)
-    ax1.axis('equal')
-    st.pyplot(fig1)
+    breakdown = pd.DataFrame({
+        'Category': ['EMI', 'Fixed', 'Leftover'],
+        'Amount': [emi, fix, max(leftover, 0)]
+    })
+    fig = px.pie(breakdown, names='Category', values='Amount', hole=0.4)
+    st.plotly_chart(fig, use_container_width=True)
 
 # --- Data Entry Pages ---
 elif choice == '💼 Data Entry':
@@ -98,11 +92,10 @@ elif choice == '💼 Data Entry':
 # --- Dashboards ---
 elif choice == '📊 Dashboards':
     st.title("📈 Dashboards")
-    tabs = st.tabs(["Annual Overview", "Monthly Trends"] )
-    
+    tabs = st.tabs(["Annual Overview", "Monthly Trends"])
+
     with tabs[0]:
         st.subheader("Annual Overview")
-        # Build annual DataFrame
         inc_df = st.session_state.data['Income']
         fix_df = st.session_state.data['Fixed Expense']
         emi_df = st.session_state.data['Credit Card EMI']
@@ -122,23 +115,23 @@ elif choice == '📊 Dashboards':
             })
         ann = pd.DataFrame(rows)
         ann['Leftover'] = ann['Income'] - ann['EMI'] - ann['Expenses'] - ann['Loan EMI'] - ann['Fixed']
-        st.dataframe(ann.style.format({'Income':'₹{:,.0f}','EMI':'₹{:,.0f}','Expenses':'₹{:,.0f}','Loan EMI':'₹{:,.0f}','Fixed':'₹{:,.0f}','Leftover':'₹{:,.0f}'}), use_container_width=True)
+        st.dataframe(ann.style.format({
+            'Income':'₹{:,.0f}','EMI':'₹{:,.0f}','Expenses':'₹{:,.0f}',
+            'Loan EMI':'₹{:,.0f}','Fixed':'₹{:,.0f}','Leftover':'₹{:,.0f}'
+        }), use_container_width=True)
     
     with tabs[1]:
         st.subheader("Last 6 Months Leftover Trend")
         last6 = ann.tail(6)
-        fig2, ax2 = plt.subplots()
-        ax2.plot(last6['Month'], last6['Leftover'], marker='o', linewidth=2)
-        ax2.set_xlabel('Month')
-        ax2.set_ylabel('Leftover (₹)')
-        ax2.grid(True, linestyle='--', alpha=0.5)
-        st.pyplot(fig2)
+        fig2 = px.line(last6, x='Month', y='Leftover', markers=True)
+        fig2.update_layout(yaxis_title='Leftover (₹)', xaxis_title='Month')
+        st.plotly_chart(fig2, use_container_width=True)
 
 # --- Future Projections ---
 elif choice == '🔮 Projections':
     st.title("🔮 Future Projections")
     st.write("Predictive analytics via ML coming soon! In the meantime, review your 3-year forecasts in the Savings module.")
 
-# --- Footer ---
 st.markdown("---")
 st.caption("Built with ❤️ using Streamlit | © 2025 Financial Tracker")
+# --- Footer ---
