@@ -56,10 +56,14 @@ choice = st.sidebar.radio("Go to", menu)
 
 data_pages = ['Income', 'Fixed Expense', 'Credit Cards', 'Credit Card EMI', 'Monthly Expenses', 'Loans', 'Savings']
 
+# --- Data Entry Utility ---
 def edit_table(sheet_name):
     st.subheader(f"{sheet_name} Entry")
     df = st.session_state.data[sheet_name]
-    edited = st.experimental_data_editor(df, num_rows="dynamic", key=sheet_name)
+    try:
+        edited = st.data_editor(df, num_rows="dynamic", key=sheet_name)
+    except AttributeError:
+        edited = st.experimental_data_editor(df, num_rows="dynamic", key=sheet_name)
     st.session_state.data[sheet_name] = edited
 
 # --- Home Page ---
